@@ -10,103 +10,127 @@
 
 ## Pattern overview
 
-- The Visitor pattern allows you to add new operations to existing object structures without modifying those structures.
-- For example, for a shooter game, you can add a new operation to the game objects to calculate the damage they receive when hit by a bullet.
-- This can be done without modifying the game objects themselves.
+- The Visitor pattern provides a way of adding functionality to existing objects without modifying them.
+
+- A visitor is created separately from the existing objects it operates on.
+
+- The visitor accesses an existing object, and performs the additional functionality.
 
 ## Problem statement
 
-- We would like a way of to update pricing for products in a catalog without increasing the complexity of the product classes.
-- The visitor pattern allows us to do this by separating the calculation logic from the product classes.
+- Assume we need to calculate discounts on various Apple Store products.
 
-## Domain application
+- The discounts have various types, such as education and employee discounts.
 
-Visitor:
+- Discount percentages can vary at any point, and additional discount types may be added in the future.
 
-- Declares a Visit operation for each class of ConcreteElement in the object structure.
-- The operation's name and signature identifies the class that sends the Visit request to the visitor.
-- That lets the visitor determine the concrete class of the element being visited.
-- Then the visitor can access the element directly through its particular interface.
+- We would like to avoid the problem of modifying the product objects directly every time a new discount type is added, or the discount percentage changes.
+
+- The visitor pattern will allow us to separate discount types, and vary their discount percentages, without modifying the product classes, satifying the open/closed principle.
+
+## Definitions
+
+#### Element:
+
+Defines the protocol that accepts different types of discount visitors.
 
 ```swift
-protocol ProductVisitor {
-  func accept(visitor: ProductVisitor)
+protocol DiscountVisitorAccepting {
+    func acceptVisitor(_ visitor: DiscountVisitor)
 }
 ```
 
-Concrete Visitor:
+#### Concrete elements:
 
-- Implements each operation declared by Visitor.
-- Each operation implements a fragment of the algorithm defined for the corresponding class of object in the structure.
-- ConcreteVisitor provides the context for the algorithm and stores its local state.
-- This state often accumulates results during the traversal of the structure.
+Concrete product types that accept a visitor according to the protocol defined above.
 
 ```swift
-class EducationDiscountVisitor: ProductVisitor {
+struct MacBookProProduct: DiscountVisitorAccepting {
+    let id: String
+    let price: Double
+
+    func acceptVisitor(_ visitor: DiscountVisitor) {
+        visitor.visitMacBookPro(self)
+    }
+}
+
+struct VisionProProduct: DiscountVisitorAccepting {
+    let id: String
+    let price: Double
+
+    func acceptVisitor(_ visitor: DiscountVisitor) {
+        visitor.visitVisionPro(self)
+    }
+}
+```
+
+#### Visitor:
+
+Defines the discount calculation methods for each product type.
+
+```swift
+protocol DiscountVisitor {
+    func visitMacBookPro(_ macBookPro: MacBookProProduct)
+    func visitVisionPro(_ visionPro: VisionProProduct)
+}
+```
+
+#### Concrete visitors:
+
+- Implements the discount calculations for each product type.
+
+- Education discount is 25%.
+
+- Employee discount is 50%.
+
+```swift
+class EducationDiscountVisitor: DiscountVisitor {
     private let discountPercentage = 0.25
+    private(set) var macBookProDiscount = 0.0
+    private(set) var visionProDiscount = 0.0
 
-    func visit(product: Product) {
-        product.price -= product.price * discountPercentage
+    func visitMacBookPro(_ macBookPro: MacBookProProduct) {
+        macBookProDiscount = macBookPro.price * discountPercentage
+    }
+
+    func visitVisionPro(_ visionPro: VisionProProduct) {
+        visionProDiscount = visionPro.price * discountPercentage
     }
 }
 
-class EmployeeDiscountVisitor: ProductVisitor {
+class EmployeeDiscountVisitor: DiscountVisitor {
     private let discountPercentage = 0.5
+    private(set) var macBookProDiscount = 0.0
+    private(set) var visionProDiscount = 0.0
 
-    func visit(product: Product) {
-        product.price -= product.price * discountPercentage
+    func visitMacBookPro(_ macBookPro: MacBookProProduct) {
+        macBookProDiscount = macBookPro.price * discountPercentage
+    }
+
+    func visitVisionPro(_ visionPro: VisionProProduct) {
+        visionProDiscount = visionPro.price * discountPercentage
     }
 }
 ```
 
-Element:
-
-Defines an Accept operation that takes a visitor as an argument.
+## Example
 
 ```swift
-protocol Product {
-    func accept(visitor: inout ProductVisitor)
-}
-```
+// Education discount for MacBook Pro
 
-ConcreteElement:
+let educationDiscountVisitor = EducationDiscountVisitor()
 
-Implements an Accept operation that takes a visitor as an argument.
+let macBookProProduct = MacBookProProduct(id: "1", price: 1000.00)
+macBookProProduct.acceptVisitor(educationDiscountVisitor)
 
-```swift
-struct MacBookProduct: Product {
-    let id: String
-    let price: Double
+print(educationDiscountVisitor.macBookProDiscount) // 250.00
 
-    func accept(visitor: ProductVisitor) {
-        visitor.visit(macProduct: self)
-    }
-}
+// Employee discount for Vision Pro
 
-struct VisionProduct: Product {
-    let id: String
-    let price: Double
+let employeeDiscountVisitor = EmployeeDiscountVisitor()
 
-    func accept(visitor: ProductVisitor) {
-        visitor.visit(visionProduct: self)
-    }
-}
-```
+let visionProProduct = VisionProProduct(id: "1", price: 10000.00)
+visionProProduct.acceptVisitor(employeeDiscountVisitor)
 
-ObjectStructure:
-
-- Can enumerate its elements.
-- May provide a high-level interface to allow the visitor to visit its elements.
-- May either be a composite or a collection such as a list or a set.
-
-```swift
-class Catalog {
-    private var products: [Product] = []
-
-    func accept(visitor: ProductVisitor) {
-        for product in products {
-            product.accept(visitor: visitor)
-        }
-    }
-}
+print(employeeDiscountVisitor.visionProDiscount) // 5000.00
 ```
