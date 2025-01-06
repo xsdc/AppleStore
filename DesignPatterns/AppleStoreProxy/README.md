@@ -10,57 +10,130 @@
 
 ## Pattern overview
 
-- The Proxy pattern provides a layer that may be used to add behavior to a class.
+- The Proxy pattern provides a layer that may be used to add behaviour to a class.
+
 - Common uses include controlling access to a class, adding logging, or to add caching.
-- It is often used in situations where you want to add behavior to a class without changing the class itself.
+
+- It is used in situations where you want to add behaviour to a class without changing the class itself.
 
 ## Problem statement
 
-- We want to add an authentication check to a service that clears a users Apple Store bag.
-- The proxy pattern allows us to add this layer of authentication without changing the bag service.
+- Apple Store users are able to add and remove items from their bag.
 
-## Domain application
+- This is done in the `Bag` class.
 
-Proxy:
+- We would like to add event logging via an analytics service to the `Bag` class, but we do not want to modify the class itself.
 
-- Maintains a reference that lets the proxy access the real subject.
-- Proxy may refer to a Subject if the RealSubject and Subject interfaces are the same.
-- Provides an interface identical to Subject's so that a proxy can by substituted for the real subject.
-- Controls access to the real subject and may be responsible for creating and deleting it.
+- To avoid the issue of adding logging to the `Bag` class, we can use the Proxy pattern.
+
+- The proxy pattern allows us to separate the analytics logic from the `Bag` class, adhering to the single responsibility principle.
+
+## Definitions
+
+#### Real subject:
+
+- The object to which we want to add behavior.
+
+- In our scenario, this is an existing `Bag` struct to which we would like to add analytics.
 
 ```swift
-class BagServiceWithAuthentication: AuthenticatedBagService {
-    let authenticationService: AuthenticationService
-    let bagService: BaseBagService
+struct Bag: ProductManaging {
+    func addProduct(_ product: Product) {
+        print("Product added to bag")
+    }
 
-    func clear() -> Bool {
-        if authenticationService.checkIfSessionIsValid() {
-            return bagService.clear()
-        } else {
-            return false
-        }
+    func removeProduct(_ product: Product) {
+        print("Product removed from bag")
+    }
+
+    func clearAllProducts() {
+        print("Bag has been cleared")
     }
 }
 ```
 
-Subject:
+#### Subject:
 
-Defines the common interface for RealSubject and Proxy so that a Proxy can be used anywhere a RealSubject is expected.
+- Defines the common protocol for the real subject and the proxy.
+
+- By defining a common protocol, we can use the proxy in place of the real subject.
+
+- The proxy will be used to add the additional analytics behaviour to the real subject `Bag`, without changing it.
 
 ```swift
-protocol AuthenticatedBagService {
-    func clear()
+protocol ProductManaging {
+    func addProduct(_ product: Product)
+    func removeProduct(_ product: Product)
+    func clearAllProducts()
 }
 ```
 
-RealSubject:
+#### Proxy:
 
-Defines the real object that the proxy represents.
+- Maintains a reference to the real subject, via dependency injection.
+
+- Share a protocol with the real subject so that the proxy can be used anywhere the real subject is expected.
+
+- We can now add the analytics behaviour to the proxy without changing the real subject, while still making use of its functionality.
 
 ```swift
-class BagService: AuthenticatedBagService {
-    func clear() -> Bool {
-        return true
+struct BagWithAnalyticsProxy: ProductManaging {
+    let bag: ProductManaging
+
+    func addProduct(_ product: Product) {
+        bag.addProduct(product)
+
+        logAnalyticsEvent(withID: "productAddedFromBag")
+    }
+
+    func removeProduct(_ product: Product) {
+        bag.removeProduct(product)
+
+        logAnalyticsEvent(withID: "productRemovedFromBag")
+    }
+
+    func clearAllProducts() {
+        bag.clearAllProducts()
+
+        logAnalyticsEvent(withID: "allProductsRemovedFromBag")
+    }
+
+    private func logAnalyticsEvent(withID id: String) {
+        print("Analytics event logged with identifier: \(id)")
     }
 }
+```
+
+## Example
+
+```swift
+struct Product {
+    let name: String
+    let price: Double
+}
+
+let bag = Bag()
+let bagWithAnalyticsProxy = BagWithAnalyticsProxy(bag: bag)
+
+bagWithAnalyticsProxy.addProduct(
+    Product(name: "iPhone", price: 999.99)
+)
+
+// Output:
+// Product added to bag
+// Analytics event logged with identifier: productAddedFromBag
+
+bagWithAnalyticsProxy.removeProduct(
+    Product(name: "iPhone", price: 999.99)
+)
+
+// Output:
+// Product removed from bag
+// Analytics event logged with identifier: productRemovedFromBag
+
+bagWithAnalyticsProxy.clearAllProducts()
+
+// Output:
+// Bag has been cleared
+// Analytics event logged with identifier: allProductsRemovedFromBag
 ```
